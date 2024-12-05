@@ -11,35 +11,37 @@ By the end of this tutorial, you will:
 
 Imagine this scenario:
 
-Sarah, a bank customer, regularly uses her online banking website to transfer money. One morning, while logged into her bank account, she receives an email about cute puppy pictures. The email looks harmless, so she clicks the link while her bank session is still active.
+Bholaram, a retired school teacher, uses State Bank of India's online banking for his pension transactions. One morning, while logged into his bank account, he receives an exciting email: "Congratulations! You've won ₹10,00,000 in the National Lucky Draw! Click here to view your winning certificate!"
 
-Unknown to Sarah, the puppy website is actually malicious. Hidden in the cute puppy page is a script that automatically sends a request to her bank's transfer endpoint:
+The email looks genuine with official-looking logos and stamps. Excited about his luck, Bholaram clicks the link while his bank session is still active.
+
+Unknown to Bholaram, the lottery website is actually malicious. Hidden behind the flashy congratulations page is a script that automatically sends a request to his bank's transfer endpoint:
 ```html
-<form action="https://sarahs-bank.com/transfer" method="POST" hidden>
-    <input type="hidden" name="recipient" value="hacker-account" />
-    <input type="hidden" name="amount" value="1000" />
+<form action="https://onlinebanking.sbi/transfer" method="POST" hidden>
+    <input type="hidden" name="recipient" value="fraudster-account" />
+    <input type="hidden" name="amount" value="50000" />
 </form>
 <script>document.forms[0].submit();</script>
 ```
 
-Because Sarah is still logged into her bank:
-1. Her browser has a valid session cookie
+Because Bholaram is still logged into his bank:
+1. His browser has a valid session cookie
 2. The malicious request includes this cookie automatically
-3. The bank's server sees a valid request from Sarah's authenticated session
-4. The transfer goes through, and Sarah loses $1,000!
+3. The bank's server sees a valid request from Bholaram's authenticated session
+4. The transfer of ₹50,000 goes through without his knowledge!
 
-This is a CSRF attack - the attacker tricks Sarah's browser into making a request she never intended to make.
+This is a CSRF attack - the attacker tricks Bholaram's browser into making a request he never intended to make. Instead of winning a lottery, he loses his hard-earned pension money!
 
 ### How CSRF Protection Helps
 
 With our CSRF protection:
-1. When Sarah logs into her bank, she gets a special CSRF token
+1. When Bholaram logs into his bank, he gets a special CSRF token
 2. Every legitimate transfer form on the bank's website includes this token
-3. The malicious puppy website doesn't have access to this token
+3. The fake lottery website doesn't have access to this token
 4. When the attack tries to transfer money, the bank's server checks for the token
-5. No valid token = no transfer = Sarah's money is safe!
+5. No valid token = no transfer = Bholaram's money stays safe!
 
-Think of it like this: The CSRF token is like a special wax seal on a medieval letter. Anyone can write a letter pretending to be you, but only you have the unique seal to prove it's genuine.
+Think of it like this: The CSRF token is like an Aadhaar-based verification. Anyone can write a letter in Bholaram's name, but only he can provide his unique Aadhaar biometric verification to prove it's genuinely him making the transaction.
 
 Now that you understand the problem, let's learn how to implement this protection in your own applications!
 
