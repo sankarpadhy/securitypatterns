@@ -1,0 +1,24 @@
+sequenceDiagram
+    actor B as Bholaram
+    participant SBI as SBI Bank Website
+    participant Browser
+    participant Scammer as Lottery Scam Site
+    
+    Note over B,Scammer: Morning: Pension Day
+    B->>SBI: 1. Logs into SBI account
+    SBI->>Browser: 2. Sets session cookie
+    Note over Browser: Cookie stored
+    
+    Note over B,Scammer: While logged in...
+    Scammer->>B: 3. Sends lottery winning email
+    B->>Scammer: 4. Clicks "View Certificate"
+    
+    Note over Scammer: Hidden malicious form
+    Scammer->>Browser: 5. Auto-submits transfer form
+    Browser->>SBI: 6. Sends request with valid cookie
+    Note over SBI: Can't distinguish from real request
+    SBI->>Scammer: 7. ₹50,000 transferred!
+    
+    Note over B: Later that day...
+    B->>SBI: 8. Checks balance
+    SBI->>B: 9. Discovers lost money 😢

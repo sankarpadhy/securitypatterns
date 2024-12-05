@@ -127,6 +127,45 @@ This visual representation helps understand why CSRF tokens are crucial for prot
 - Maven installed
 - IDE (preferably IntelliJ IDEA or Eclipse)
 
+## Project Structure
+```
+csrf-protection/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/
+│   │   │       └── example/
+│   │   │           └── csrf/
+│   │   │               ├── CsrfProtectionApplication.java
+│   │   │               ├── config/
+│   │   │               │   └── SecurityConfig.java
+│   │   │               ├── controller/
+│   │   │               │   ├── AuthController.java
+│   │   │               │   └── TransferController.java
+│   │   │               ├── model/
+│   │   │               │   └── TransferRequest.java
+│   │   │               └── service/
+│   │   │                   └── TransferService.java
+│   │   └── resources/
+│   │       ├── static/
+│   │       │   ├── css/
+│   │       │   │   └── styles.css
+│   │       │   └── js/
+│   │       │       └── main.js
+│   │       └── templates/
+│   │           └── index.html
+│   └── test/
+│       └── java/
+│           └── com/
+│               └── example/
+│                   └── csrf/
+│                       └── CsrfProtectionTests.java
+├── pom.xml
+├── README.md
+├── attack_scenario.mmd
+└── csrf_protection.mmd
+```
+
 ## Project Context
 Imagine you're building a banking application where users can transfer money. Without proper CSRF protection, attackers could trick users into making unauthorized transfers. This tutorial demonstrates how to prevent such attacks.
 
@@ -251,19 +290,212 @@ By understanding the role of `SecurityFilterChain`, you can effectively manage a
        public CsrfToken getCsrfToken(CsrfToken token) {
            return token;
        }
+
+       @PostMapping("/login")
+       public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+           try {
+               // Create authentication token
+               UsernamePasswordAuthenticationToken authToken = 
+                   new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword());
+               
+               // Authenticate user
+               Authentication authentication = 
+                   authenticationManager.authenticate(authToken);
+               
+               // Set authentication in security context
+               SecurityContextHolder.getContext()
+                   .setAuthentication(authentication);
+               
+               return ResponseEntity.ok()
+                   .body(Map.of("status", "success", "message", "Login successful"));
+           } catch (AuthenticationException e) {
+               return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                   .body(Map.of("status", "error", "message", "Invalid credentials"));
+           }
+       }
+
+       @PostMapping("/logout")
+       public ResponseEntity<?> logout(HttpServletRequest request, 
+                                     HttpServletResponse response) {
+           // Get authentication
+           Authentication auth = SecurityContextHolder.getContext()
+               .getAuthentication();
+           
+           if (auth != null) {
+               // Perform logout
+               new SecurityContextLogoutHandler()
+                   .logout(request, response, auth);
+               
+               // Clear CSRF token cookie
+               Cookie csrfCookie = new Cookie("XSRF-TOKEN", null);
+               csrfCookie.setMaxAge(0);
+               csrfCookie.setPath("/");
+               response.addCookie(csrfCookie);
+           }
+           
+           return ResponseEntity.ok()
+               .body(Map.of("status", "success", "message", "Logout successful"));
+       }
    }
    ```
 
 2. Create `TransferController.java`:
    ```java
    @RestController
+   @RequestMapping("/api/transfer")
    public class TransferController {
-       @PostMapping("/transfer")
-       public ResponseEntity<?> transfer(@RequestParam String recipient, 
-                                       @RequestParam BigDecimal amount) {
-           // Transfer logic here
-           return ResponseEntity.ok().build();
+       private final TransferService transferService;
+       
+       public TransferController(TransferService transferService) {
+           this.transferService = transferService;
        }
+       
+       @PostMapping
+       public ResponseEntity<?> transfer(@RequestBody TransferRequest request) {
+           try {
+               // Get current authenticated user
+               Authentication auth = SecurityContextHolder.getContext()
+                   .getAuthentication();
+               String username = auth.getName();
+               
+               // Perform transfer
+               TransferResult result = transferService.transfer(
+                   username,
+                   request.getRecipient(),
+                   request.getAmount()
+               );
+               
+               return ResponseEntity.ok()
+                   .body(Map.of(
+                       "status", "success",
+                       "message", "Transfer successful",
+                       "transactionId", result.getTransactionId()
+                   ));
+           } catch (InsufficientFundsException e) {
+               return ResponseEntity.badRequest()
+                   .body(Map.of("status", "error", "message", "Insufficient funds"));
+           } catch (Exception e) {
+               return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                   .body(Map.of("status", "error", "message", "Transfer failed"));
+           }
+       }
+   }
+   ```
+
+3. Update frontend JavaScript to handle authentication and transfers:
+   ```javascript
+   // Authentication and CSRF token management
+   class SecurityManager {
+       static async fetchCsrfToken() {
+           const response = await fetch('/api/auth/csrf-token');
+           const token = await response.json();
+           return token;
+       }
+       
+       static async login(username, password) {
+           const token = await this.fetchCsrfToken();
+           const response = await fetch('/api/auth/login', {
+               method: 'POST',
+               headers: {
+                   'Content-Type': 'application/json',
+                   [token.headerName]: token.token
+               },
+               body: JSON.stringify({ username, password })
+           });
+           return response.json();
+       }
+       
+       static async logout() {
+           const token = await this.fetchCsrfToken();
+           const response = await fetch('/api/auth/logout', {
+               method: 'POST',
+               headers: {
+                   [token.headerName]: token.token
+               }
+           });
+           return response.json();
+       }
+   }
+
+   // Transfer management
+   class TransferManager {
+       static async transfer(recipient, amount) {
+           const token = await SecurityManager.fetchCsrfToken();
+           const response = await fetch('/api/transfer', {
+               method: 'POST',
+               headers: {
+                   'Content-Type': 'application/json',
+                   [token.headerName]: token.token
+               },
+               body: JSON.stringify({ recipient, amount })
+           });
+           return response.json();
+       }
+   }
+
+   // Event handlers
+   document.getElementById('loginForm').addEventListener('submit', async (e) => {
+       e.preventDefault();
+       const username = document.getElementById('username').value;
+       const password = document.getElementById('password').value;
+       
+       try {
+           const result = await SecurityManager.login(username, password);
+           if (result.status === 'success') {
+               updateUI('logged-in');
+               showMessage('Login successful', 'success');
+           } else {
+               showMessage(result.message, 'error');
+           }
+       } catch (error) {
+           showMessage('Login failed', 'error');
+       }
+   });
+
+   document.getElementById('logoutButton').addEventListener('click', async () => {
+       try {
+           const result = await SecurityManager.logout();
+           if (result.status === 'success') {
+               updateUI('logged-out');
+               showMessage('Logout successful', 'success');
+           }
+       } catch (error) {
+           showMessage('Logout failed', 'error');
+       }
+   });
+
+   document.getElementById('transferForm').addEventListener('submit', async (e) => {
+       e.preventDefault();
+       const recipient = document.getElementById('recipient').value;
+       const amount = document.getElementById('amount').value;
+       
+       try {
+           const result = await TransferManager.transfer(recipient, amount);
+           if (result.status === 'success') {
+               showMessage(`Transfer successful. Transaction ID: ${result.transactionId}`, 'success');
+               document.getElementById('transferForm').reset();
+           } else {
+               showMessage(result.message, 'error');
+           }
+       } catch (error) {
+           showMessage('Transfer failed', 'error');
+       }
+   });
+
+   // UI helper functions
+   function updateUI(state) {
+       document.body.className = `container mt-5 ${state}`;
+   }
+
+   function showMessage(message, type) {
+       const alertDiv = document.createElement('div');
+       alertDiv.className = `alert alert-${type === 'success' ? 'success' : 'danger'} mt-3`;
+       alertDiv.textContent = message;
+       
+       const container = document.querySelector('.container');
+       container.insertBefore(alertDiv, container.firstChild);
+       
+       setTimeout(() => alertDiv.remove(), 5000);
    }
    ```
 

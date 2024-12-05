@@ -1,0 +1,21 @@
+sequenceDiagram
+    actor B as Bholaram
+    participant SBI as SBI Bank (Protected)
+    participant Browser
+    participant Scammer as Lottery Scam Site
+    
+    B->>SBI: 1. Logs into SBI account
+    SBI->>Browser: 2. Sets session cookie
+    SBI->>Browser: 3. Sets CSRF token
+    Note over Browser: Stores token securely
+    
+    Scammer->>B: 4. Sends lottery email
+    B->>Scammer: 5. Clicks "View Certificate"
+    
+    Note over Scammer: Attempts attack
+    Scammer->>Browser: 6. Auto-submits transfer form
+    Note over Browser: No CSRF token!
+    Browser->>SBI: 7. Sends request
+    Note over SBI: Validates CSRF token
+    SBI->>Browser: 8. Rejects request - Invalid token
+    Note over B: Money stays safe! 💰
