@@ -372,4 +372,69 @@ We welcome contributions! Please:
 ## License
 MIT License - Feel free to use this code for learning and development
 
+### The Attack Scenario Visualized
+```mermaid
+sequenceDiagram
+    actor B as Bholaram
+    participant SBI as SBI Bank Website
+    participant Browser
+    participant Scammer as Lottery Scam Site
+    
+    Note over B,Scammer: Morning: Pension Day
+    B->>SBI: 1. Logs into SBI account
+    SBI->>Browser: 2. Sets session cookie
+    Note over Browser: Cookie stored
+    
+    Note over B,Scammer: While logged in...
+    Scammer->>B: 3. Sends lottery winning email
+    B->>Scammer: 4. Clicks "View Certificate"
+    
+    Note over Scammer: Hidden malicious form
+    Scammer->>Browser: 5. Auto-submits transfer form
+    Browser->>SBI: 6. Sends request with valid cookie
+    Note over SBI: Can't distinguish from real request
+    SBI->>Scammer: 7. ₹50,000 transferred!
+    
+    Note over B: Later that day...
+    B->>SBI: 8. Checks balance
+    SBI->>B: 9. Discovers lost money 😢
+
+```
+
+### With CSRF Protection
+```mermaid
+sequenceDiagram
+    actor B as Bholaram
+    participant SBI as SBI Bank (Protected)
+    participant Browser
+    participant Scammer as Lottery Scam Site
+    
+    B->>SBI: 1. Logs into SBI account
+    SBI->>Browser: 2. Sets session cookie
+    SBI->>Browser: 3. Sets CSRF token
+    Note over Browser: Stores token securely
+    
+    Scammer->>B: 4. Sends lottery email
+    B->>Scammer: 5. Clicks "View Certificate"
+    
+    Note over Scammer: Still tries attack
+    Scammer->>Browser: 6. Auto-submits transfer form
+    Note over Browser: No CSRF token!
+    Browser->>SBI: 7. Sends request
+    SBI->>Browser: 8. Rejects! No valid token
+    Note over B: Money stays safe 😊
+    
+    Note over B: Making legitimate transfer
+    B->>SBI: 9. Uses real SBI transfer page
+    Note over SBI: Form includes CSRF token
+    SBI->>B: 10. Transfer succeeds
+```
+
+The diagrams above illustrate how:
+1. The scammer exploits Bholaram's active session in the first scenario
+2. CSRF protection blocks the fraudulent transfer in the second scenario
+3. Only legitimate transfers from SBI's website succeed
+
+This visual representation helps understand why CSRF tokens are crucial for protecting users like Bholaram from such attacks.
+
 Remember: Security is a continuous process. Stay updated with the latest security practices and regularly review your implementation.
