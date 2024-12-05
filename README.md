@@ -152,6 +152,113 @@ Imagine you're building a banking application where users can transfer money. Wi
    - Verify CSRF token in browser dev tools
    - Attempt transfer without token (should fail)
 
+## System Architecture
+
+### Component Overview
+```mermaid
+graph TB
+    subgraph "Client Side"
+        B[Browser]
+        C[CSRF Token Cookie]
+        H[Hidden Form Field]
+        SC[Session Cookie]
+    end
+    
+    subgraph "Spring Security Layer"
+        F[CsrfFilter]
+        V[CsrfTokenValidator]
+        R[CsrfTokenRepository]
+        AF[AuthenticationFilter]
+        AS[AuthenticationService]
+    end
+    
+    subgraph "Application Layer"
+        A[Authentication]
+        P[Protected Endpoints]
+        S[Services]
+        U[(User Repository)]
+    end
+
+    %% Authentication Flow
+    B --1.Login Request--> AF
+    AF --2.Validate Credentials--> AS
+    AS --3.Check User--> U
+    AS --4.Create Session--> SC
+    
+    %% CSRF Protection Flow
+    B --5.Initial Request--> F
+    F --6.Generate Token--> R
+    R --7.Store Token--> C
+    R --8.Include in Response--> H
+    
+    %% Protected Resource Access
+    B --9.Submit with Token--> F
+    F --10.Check Session--> AF
+    F --11.Extract & Verify--> V
+    V --12.If Valid--> P
+    P --13.Process--> S
+```
+
+### Attack Prevention Workflow
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant B as Browser
+    participant M as Malicious Site
+    participant A as Bank App
+    
+    Note over U,A: Attack Scenario (Without CSRF Protection)
+    U->>B: 1. Log into bank website
+    Note over B: User is now authenticated
+    U->>M: 2. Visit malicious site
+    M->>B: 3. Load page with hidden form
+    Note over M: Form targets bank's transfer endpoint
+    M->>B: 4. Auto-submit form via JavaScript
+    B->>A: 5. POST /transfer (with valid session cookie)
+    A->>B: 6. Process transfer (Attack succeeds!)
+
+    Note over U,A: With CSRF Protection
+    U->>B: 1. Log into bank website
+    B->>A: 2. GET /dashboard
+    A->>B: 3. Send CSRF token
+    U->>M: 4. Visit malicious site
+    M->>B: 5. Auto-submit form
+    B->>A: 6. POST without CSRF token
+    A->>B: 7. 403 Forbidden (Attack prevented!)
+```
+
+### Security Components
+```mermaid
+graph LR
+    subgraph "Frontend Security"
+        T[CSRF Token]
+        F[Forms]
+        A[AJAX Requests]
+    end
+
+    subgraph "Security Filters"
+        CF[CsrfFilter]
+        TR[TokenRepository]
+        TV[TokenValidator]
+    end
+
+    subgraph "Protected Resources"
+        PE[POST Endpoints]
+        PU[PUT Endpoints]
+        PD[DELETE Endpoints]
+    end
+
+    T -->|Included In| F
+    T -->|Header X-CSRF-TOKEN| A
+    F -->|Submit| CF
+    A -->|Submit| CF
+    CF -->|Validate| TV
+    CF -->|Store/Retrieve| TR
+    TV -->|If Valid| PE
+    TV -->|If Valid| PU
+    TV -->|If Valid| PD
+```
+
 ## Common Pitfalls and Solutions
 
 ### 1. Token Not Being Sent
