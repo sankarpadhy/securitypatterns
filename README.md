@@ -7,6 +7,42 @@ By the end of this tutorial, you will:
 3. Master best practices for token-based security
 4. Build a secure money transfer application with CSRF protection
 
+## Understanding CSRF Through a Real-World Analogy
+
+Imagine this scenario:
+
+Sarah, a bank customer, regularly uses her online banking website to transfer money. One morning, while logged into her bank account, she receives an email about cute puppy pictures. The email looks harmless, so she clicks the link while her bank session is still active.
+
+Unknown to Sarah, the puppy website is actually malicious. Hidden in the cute puppy page is a script that automatically sends a request to her bank's transfer endpoint:
+```html
+<form action="https://sarahs-bank.com/transfer" method="POST" hidden>
+    <input type="hidden" name="recipient" value="hacker-account" />
+    <input type="hidden" name="amount" value="1000" />
+</form>
+<script>document.forms[0].submit();</script>
+```
+
+Because Sarah is still logged into her bank:
+1. Her browser has a valid session cookie
+2. The malicious request includes this cookie automatically
+3. The bank's server sees a valid request from Sarah's authenticated session
+4. The transfer goes through, and Sarah loses $1,000!
+
+This is a CSRF attack - the attacker tricks Sarah's browser into making a request she never intended to make.
+
+### How CSRF Protection Helps
+
+With our CSRF protection:
+1. When Sarah logs into her bank, she gets a special CSRF token
+2. Every legitimate transfer form on the bank's website includes this token
+3. The malicious puppy website doesn't have access to this token
+4. When the attack tries to transfer money, the bank's server checks for the token
+5. No valid token = no transfer = Sarah's money is safe!
+
+Think of it like this: The CSRF token is like a special wax seal on a medieval letter. Anyone can write a letter pretending to be you, but only you have the unique seal to prove it's genuine.
+
+Now that you understand the problem, let's learn how to implement this protection in your own applications!
+
 ## Prerequisites
 - Basic knowledge of Spring Boot
 - Understanding of web security concepts
